@@ -107,7 +107,7 @@ public class LogReader extends JFrame{
                 }
                 try {
                     con = HttpClient.newHttpClient();
-                    cf = new ConnectToFile("http://perseus:8255/" + pathText.getText() + fileText.getText(), con, explicitSearchText, outputText, fileText);
+                    cf = new ConnectToFile("http://wist.dwd.de:8080" + pathText.getText() + fileText.getText(), con, explicitSearchText, outputText, fileText);
                     outputText.setText(cf.outputString());
                 } catch (Exception ex) {
                     ex.printStackTrace();

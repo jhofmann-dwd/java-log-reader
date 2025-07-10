@@ -36,14 +36,14 @@ public class ConnectToFile {
                     .build();
 
             //TODO: Enable authentication when it is needed
-/*            con = HttpClient.newBuilder()
+            con = HttpClient.newBuilder()
                     .authenticator(new Authenticator() {
                         @Override
                         protected PasswordAuthentication getPasswordAuthentication() {
-                            return new PasswordAuthentication("username", "password".toCharArray());
+                            return new PasswordAuthentication("<insert username>", "<insert pw>".toCharArray());
                         }
                     })
-                    .build();*/
+                    .build();
 
 
             con.sendAsync(request, HttpResponse.BodyHandlers.ofLines())
