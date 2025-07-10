@@ -10,10 +10,13 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient;
+import java.net.http.HttpResponse;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -28,12 +31,15 @@ public class LogReader extends JFrame{
     private JLabel fileLabel;
     private JButton confirmBtn;
     private JButton exitBtn;
+    private JLabel outputLabel;
 
     // Load font from resources
     InputStream crobotoBold = Main.class.getResourceAsStream("/dwd/log/javalogreader/resources/Roboto-Regular.ttf");
     InputStream crobotoRegular = Main.class.getResourceAsStream("/dwd/log/javalogreader/resources/Roboto-Regular.ttf");
+    InputStream crobotoBigBold = Main.class.getResourceAsStream("/dwd/log/javalogreader/resources/Roboto-Regular.ttf");
     Font robotoBold = Font.createFont(Font.TRUETYPE_FONT, crobotoBold).deriveFont(18f).deriveFont(Font.BOLD); // 18pt size and bold
     Font robotoRegular = Font.createFont(Font.TRUETYPE_FONT, crobotoRegular).deriveFont(18f); // 18pt size
+    Font robotoBoldBig = Font.createFont(Font.TRUETYPE_FONT, crobotoBigBold).deriveFont(22f). deriveFont(Font.BOLD);
 
     HttpClient con;
     ConnectToFile cf;
@@ -49,6 +55,7 @@ public class LogReader extends JFrame{
         explicitSearchLabel.setBorder(new EmptyBorder(0,0,0,5));
         pathLabel.setBorder(new EmptyBorder(0,100,0,5));
         fileLabel.setBorder(new EmptyBorder(0,0,0,5));
+        outputLabel.setBorder(new EmptyBorder(30,0,5,0));
 
         pathLabel.setFont(robotoBold);
         pathText.setFont(robotoRegular);
@@ -59,6 +66,7 @@ public class LogReader extends JFrame{
         confirmBtn.setFont(robotoBold);
         exitBtn.setFont(robotoBold);
         outputText.setFont(robotoRegular);
+        outputLabel.setFont(robotoBoldBig);
 
 
         setTitle("Book Editor");
@@ -69,13 +77,8 @@ public class LogReader extends JFrame{
         // Set the frame location to the center of the screen
         setLocationRelativeTo(null);
 
-        /*// Cancel button event listener
-        cancelButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                cancelChanges();
-            }
-        });*/
+        outputText.setEditable(false);
+
 
         // Set the frame visible
         setVisible(true);
@@ -104,7 +107,7 @@ public class LogReader extends JFrame{
                 }
                 try {
                     con = HttpClient.newHttpClient();
-                    cf = new ConnectToFile("http://perseus:8255/" + pathText.getText(), con);
+                    cf = new ConnectToFile("http://perseus:8255/" + pathText.getText() + fileText.getText(), con, explicitSearchText, outputText, fileText);
                     outputText.setText(cf.outputString());
                 } catch (Exception ex) {
                     ex.printStackTrace();

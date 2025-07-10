@@ -8,6 +8,7 @@ import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class ConnectToFile {
 
@@ -15,10 +16,16 @@ public class ConnectToFile {
     String url;
     HttpClient con;
     StringBuilder output;
+    JTextField input;
+    JTextArea result;
+    JTextField fileText;
 
-    public ConnectToFile(String url, HttpClient con) throws MalformedURLException, URISyntaxException {
+    public ConnectToFile(String url, HttpClient con, JTextField input, JTextArea result, JTextField fileText) throws MalformedURLException, URISyntaxException {
         this.url = url;
         this.con = con;
+        this.input = input;
+        this.result = result;
+        this.fileText = fileText;
     }
 
     public String outputString() throws IOException {
@@ -30,9 +37,26 @@ public class ConnectToFile {
                     .GET()
                     .build();
 
-            // 3. Request senden und Antwort erhalten
-            HttpResponse<String> response = con.send(request, HttpResponse.BodyHandlers.ofString());
 
+            con.sendAsync(request, HttpResponse.BodyHandlers.ofLines())
+                    .thenApply(HttpResponse::body)
+                    .thenAccept(lines -> {
+                        StringBuilder filtered = new StringBuilder();
+                        AtomicInteger lineCounter = new AtomicInteger();
+                        lines.forEach(line -> {
+                            lineCounter.getAndIncrement();
+                            if (input.getText().isEmpty() || line.contains(input.getText())) {
+                                filtered.append("[").append("FILE: ").append(fileText.getText()).append(" | ").append("LINE: ").append(lineCounter).append("]").append("\t").append(line).append("\n");
+                            }
+                        });
+                        SwingUtilities.invokeLater(() -> result.setText(filtered.toString()));
+                    })
+                    .exceptionally(ex -> {
+                        SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(null, "Verbindungsfehler oder ungültige Datei", "FEHLER", JOptionPane.ERROR_MESSAGE));
+                        return null;
+                    });
+            // 3. Request senden und Antwort erhalten
+            /*HttpResponse<String> response = con.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() == 404) {
                 JOptionPane.showMessageDialog(null, "Error 404: File not Found", "ERROR 404", JOptionPane.ERROR_MESSAGE);
                 throw new RuntimeException();
@@ -52,13 +76,13 @@ public class ConnectToFile {
             output = new StringBuilder();
             output.append(response.body());
 
-            return output.toString();
+            return output.toString();*/
 
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        throw new IOException("Error");
+        return null;
 
         /*con = (HttpURLConnection) url.openConnection();
         con.setRequestMethod("GET");
