@@ -1,6 +1,7 @@
 package dwd.log.javalogreader;
 
 import dwd.log.javalogreader.forms.LogReader;
+import dwd.log.javalogreader.forms.LoginForm;
 
 import javax.swing.*;
 import java.awt.*;
@@ -14,19 +15,25 @@ public class Main {
         // Launch the book editor form
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
-                LogReader logReader = null;
+/*
+                SwingUtilities.invokeLater(() -> {
+                    LoginForm login = new LoginForm(null);
+                    login.setVisible(true);
+
+                    if (login.isSucceeded()) {
+
+                    } else {
+                        System.exit(0);
+                    }
+                });
+*/
+                LoginForm login = null;
                 try {
-                    logReader = new LogReader();
-                } catch (MalformedURLException e) {
-                    throw new RuntimeException(e);
-                } catch (URISyntaxException e) {
-                    throw new RuntimeException(e);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                } catch (FontFormatException e) {
+                    login = new LoginForm();
+                } catch (IOException | FontFormatException e) {
                     throw new RuntimeException(e);
                 }
-                logReader.setVisible(true);
+                login.setVisible(true);
             }
         });
     }

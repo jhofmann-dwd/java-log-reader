@@ -10,13 +10,10 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient;
-import java.net.http.HttpResponse;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -32,6 +29,7 @@ public class LogReader extends JFrame{
     private JButton confirmBtn;
     private JButton exitBtn;
     private JLabel outputLabel;
+    private JCheckBox noSearchCheck;
 
     // Load font from resources
     InputStream crobotoBold = Main.class.getResourceAsStream("/dwd/log/javalogreader/resources/Roboto-Regular.ttf");
@@ -44,8 +42,7 @@ public class LogReader extends JFrame{
     HttpClient con;
     ConnectToFile cf;
 
-
-    public LogReader() throws IOException, URISyntaxException, FontFormatException {
+    public LogReader(String username, String password, String host) throws IOException, URISyntaxException, FontFormatException {
 
         Border border = explicitSearchText.getBorder();
         Border margin = new EmptyBorder(2,0,2,0);
@@ -57,6 +54,7 @@ public class LogReader extends JFrame{
         fileLabel.setBorder(new EmptyBorder(0,0,0,5));
         outputLabel.setBorder(new EmptyBorder(30,0,5,0));
 
+        //Setting up fonts
         pathLabel.setFont(robotoBold);
         pathText.setFont(robotoRegular);
         fileLabel.setFont(robotoBold);
@@ -82,6 +80,7 @@ public class LogReader extends JFrame{
 
         // Set the frame visible
         setVisible(true);
+
         confirmBtn.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -91,7 +90,7 @@ public class LogReader extends JFrame{
                 HashMap<Boolean, String> test = new HashMap();
 
                 test.put(pathText.getText().isEmpty() || pathText.getText() == null, "Pfad");
-                test.put(explicitSearchText.getText().isEmpty() || explicitSearchLabel.getText() == null , "Suchwert");
+                test.put(explicitSearchText.getText().isEmpty() && !noSearchCheck.isSelected() || explicitSearchLabel.getText() == null && !noSearchCheck.isSelected(), "Suchwert");
                 test.put(fileText.getText().isEmpty() || fileText.getText() == null, "Dateiname");
 
                 for(Map.Entry<Boolean, String> entry : test.entrySet())
@@ -107,7 +106,7 @@ public class LogReader extends JFrame{
                 }
                 try {
                     con = HttpClient.newHttpClient();
-                    cf = new ConnectToFile("http://wist.dwd.de:8080" + pathText.getText() + fileText.getText(), con, explicitSearchText, outputText, fileText);
+                    cf = new ConnectToFile("http://"+ host + pathText.getText() + fileText.getText(), con, explicitSearchText.getText(), outputText, fileText.getText(), username, password, noSearchCheck.isSelected());
                     outputText.setText(cf.outputString());
                 } catch (Exception ex) {
                     ex.printStackTrace();
