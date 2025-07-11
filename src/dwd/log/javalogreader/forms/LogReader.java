@@ -31,6 +31,9 @@ public class LogReader extends JFrame{
     private JLabel outputLabel;
     private JCheckBox noSearchCheck;
 
+    //Local Variables
+    private static final String HTTP_REQUEST_BEGIN = "http://";
+
     // Load font from resources
     InputStream crobotoBold = Main.class.getResourceAsStream("/dwd/log/javalogreader/resources/Roboto-Regular.ttf");
     InputStream crobotoRegular = Main.class.getResourceAsStream("/dwd/log/javalogreader/resources/Roboto-Regular.ttf");
@@ -106,7 +109,7 @@ public class LogReader extends JFrame{
                 }
                 try {
                     con = HttpClient.newHttpClient();
-                    cf = new ConnectToFile("http://"+ host + pathText.getText() + fileText.getText(), con, explicitSearchText.getText(), outputText, fileText.getText(), username, password, noSearchCheck.isSelected());
+                    cf = new ConnectToFile(HTTP_REQUEST_BEGIN + host + pathText.getText() + fileText.getText(), con, explicitSearchText.getText(), outputText, fileText.getText(), username, password, noSearchCheck.isSelected());
                     outputText.setText(cf.outputString());
                 } catch (Exception ex) {
                     ex.printStackTrace();
