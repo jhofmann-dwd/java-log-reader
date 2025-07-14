@@ -47,6 +47,8 @@ public class LoginForm extends JDialog {
         userText.setFont(robotoRegular);
         passLabel.setFont(robotoBold);
         passText.setFont(robotoRegular);
+        hostLabel.setFont(robotoBold);
+        hostText.setFont(robotoRegular);
 
 
         buttonOK.addActionListener(new ActionListener() {

@@ -11,6 +11,8 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.ItemEvent;
+import java.awt.event.ItemListener;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.Authenticator;
@@ -18,6 +20,7 @@ import java.net.MalformedURLException;
 import java.net.PasswordAuthentication;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient;
+import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -34,10 +37,24 @@ public class LogReader extends JFrame{
     private JButton exitBtn;
     private JLabel outputLabel;
     private JCheckBox noSearchCheck;
+    private JComboBox minSecondCB;
+    private JLabel minSecondLabel;
+    private JLabel minMinuteLabel;
+    private JLabel minHourLabel;
+    private JLabel timeLabel;
+    private JComboBox minHourCB;
+    private JComboBox minMinuteCB;
+    private JLabel maxHourLabel;
+    private JLabel maxMinuteLabel;
+    private JLabel maxSecondLabel;
+    private JComboBox maxHourCB;
+    private JComboBox maxMinuteCB;
+    private JComboBox maxSecondCB;
 
     //Local Variables
     private static final String HTTP_REQUEST_BEGIN = "http://";
     private static final char HTTP_REQUEST_SLASH = '/';
+    String pastContent = "";
 
     // Load font from resources
     InputStream crobotoBold = Main.class.getResourceAsStream("/dwd/log/javalogreader/resources/Roboto-Regular.ttf");
@@ -73,7 +90,38 @@ public class LogReader extends JFrame{
         exitBtn.setFont(robotoBold);
         outputText.setFont(robotoRegular);
         outputLabel.setFont(robotoBoldBig);
+        timeLabel.setFont(robotoBoldBig);
+        minHourLabel.setFont(robotoBold);
+        minHourCB.setFont(robotoRegular);
+        minMinuteLabel.setFont(robotoBold);
+        minMinuteCB.setFont(robotoRegular);
+        minSecondLabel.setFont(robotoBold);
+        minSecondCB.setFont(robotoRegular);
+        maxHourLabel.setFont(robotoBold);
+        maxHourCB.setFont(robotoRegular);
+        maxMinuteLabel.setFont(robotoBold);
+        maxMinuteCB.setFont(robotoRegular);
+        maxSecondLabel.setFont(robotoBold);
+        maxSecondCB.setFont(robotoRegular);
 
+        //Set minutes and seconds
+        for(int i = 0; i < 60; i++)
+        {
+            minMinuteCB.addItem(i);
+            minSecondCB.addItem(i);
+            maxMinuteCB.addItem(i);
+            maxSecondCB.addItem(i);
+        }
+        //Set Hour
+        for(int i = 0; i < 24; i++)
+        {
+            minHourCB.addItem(i);
+            maxHourCB.addItem(i);
+        }
+
+        minHourCB.setSelectedIndex(12);
+        maxHourCB.setSelectedIndex(12);
+        maxMinuteCB.setSelectedIndex(1);
 
         setTitle("Java Log Reader");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -95,7 +143,19 @@ public class LogReader extends JFrame{
 
                 outputText.setText("");
 
-                HashMap<Boolean, String> test = new HashMap();
+
+
+                try {
+                    LocalTime minTime = LocalTime.of(minHourCB.getSelectedIndex(), minMinuteCB.getSelectedIndex(), minSecondCB.getSelectedIndex());
+                    LocalTime maxTime = LocalTime.of(maxHourCB.getSelectedIndex(), maxMinuteCB.getSelectedIndex(), maxSecondCB.getSelectedIndex());
+
+                    boolean isTrue = !minTime.isAfter(maxTime);
+
+                    if (!isTrue) {
+                        throw new RuntimeException();
+                    }
+
+                HashMap<Boolean, String> test = new HashMap<>();
 
                 test.put(pathText.getText().isEmpty() || pathText.getText() == null, "Pfad");
                 test.put(explicitSearchText.getText().isEmpty() && !noSearchCheck.isSelected() || explicitSearchLabel.getText() == null && !noSearchCheck.isSelected(), "Suchwert");
@@ -123,7 +183,7 @@ public class LogReader extends JFrame{
                             })
                             .build();
 
-                    cf = new ConnectToFile(url, con, explicitSearchText.getText(), outputText, fileText.getText(), username, password, noSearchCheck.isSelected());
+                    cf = new ConnectToFile(url, con, explicitSearchText.getText(), outputText, fileText.getText(), username, password, noSearchCheck.isSelected(), minTime, maxTime);
                     // Handle the CompletableFuture properly
                     cf.outputString()
                             .exceptionally(ex -> {
@@ -150,6 +210,10 @@ public class LogReader extends JFrame{
                 } catch (MalformedURLException ex) {
                     throw new RuntimeException(ex);
                 }
+                }catch (RuntimeException f)
+                {
+                    JOptionPane.showMessageDialog(null, "Inkorrekte Zeitangabe", "FEHLER", JOptionPane.ERROR_MESSAGE);
+                }
             }
         });
 
@@ -157,6 +221,24 @@ public class LogReader extends JFrame{
             @Override
             public void actionPerformed(ActionEvent e) {
                 System.exit(1);            }
+        });
+
+        noSearchCheck.addItemListener(new ItemListener() {
+            @Override
+            public void itemStateChanged(ItemEvent e) {
+
+                if(noSearchCheck.isSelected())
+                {
+                    pastContent = explicitSearchText.getText();
+                    explicitSearchText.setEditable(false);
+                    explicitSearchText.setText("");
+                }
+                else{
+                    explicitSearchText.setEditable(true);
+                    explicitSearchText.setText(pastContent);
+                    pastContent = "";
+                }
+            }
         });
     }
 }
