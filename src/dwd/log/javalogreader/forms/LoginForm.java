@@ -9,8 +9,6 @@ import java.awt.event.*;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.*;
-import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class LoginForm extends JDialog {
     private JPanel contentPane;
@@ -88,35 +86,32 @@ public class LoginForm extends JDialog {
     }
 
     private void onOK() throws IOException, URISyntaxException, FontFormatException {
-        /*AtomicReference<LogReader> logReader = new AtomicReference<>();
-
         cf = new ConnectToFile();
 
-        cf.checkAuth(userText.getText(), Arrays.toString(passText.getPassword()), hostText.getText()).thenAccept(success -> {
-            if(success) {
-                try {
-                     logReader.set(new LogReader(userText.getText(), Arrays.toString(passText.getPassword()), hostText.getText()));
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                } catch (URISyntaxException e) {
-                    throw new RuntimeException(e);
-                } catch (FontFormatException e) {
-                    throw new RuntimeException(e);
-                }
-                JOptionPane.showMessageDialog(null, "Login erfolgreich!");
-                logReader.get().setVisible(true);
-                dispose();
-            }
-            else {
-                JOptionPane.showMessageDialog(null, "Login fehlgeschlagen", "Fehler", JOptionPane.ERROR_MESSAGE);
-            }
-        });*/
-
-        LogReader lr = new LogReader(userText.getText(), Arrays.toString(passText.getPassword()), hostText.getText());
-        lr.setVisible(true);
-        dispose();
-
+        cf.checkAuth(userText.getText(), new String(passText.getPassword()), hostText.getText())
+                .thenAccept(success -> {
+                    if(success) {
+                        try {
+                            LogReader lr = new LogReader(userText.getText(),
+                                    new String(passText.getPassword()),
+                                    hostText.getText());
+                            lr.setVisible(true);
+                            dispose();
+                        } catch (Exception e) {
+                            JOptionPane.showMessageDialog(null,
+                                    "Fehler beim Öffnen des LogReaders: " + e.getMessage(),
+                                    "Fehler",
+                                    JOptionPane.ERROR_MESSAGE);
+                        }
+                    } else {
+                        JOptionPane.showMessageDialog(null,
+                                "Login fehlgeschlagen",
+                                "Fehler",
+                                JOptionPane.ERROR_MESSAGE);
+                    }
+                });
     }
+
 
     private void onCancel() {
         System.exit(1);

@@ -2,6 +2,7 @@ package dwd.log.javalogreader.forms;
 
 import dwd.log.javalogreader.ConnectToFile;
 import dwd.log.javalogreader.Main;
+import dwd.log.javalogreader.UrlBuilder;
 
 import javax.swing.*;
 import javax.swing.border.Border;
@@ -12,6 +13,9 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.Authenticator;
+import java.net.MalformedURLException;
+import java.net.PasswordAuthentication;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.util.HashMap;
@@ -33,6 +37,7 @@ public class LogReader extends JFrame{
 
     //Local Variables
     private static final String HTTP_REQUEST_BEGIN = "http://";
+    private static final char HTTP_REQUEST_SLASH = '/';
 
     // Load font from resources
     InputStream crobotoBold = Main.class.getResourceAsStream("/dwd/log/javalogreader/resources/Roboto-Regular.ttf");
@@ -70,7 +75,7 @@ public class LogReader extends JFrame{
         outputLabel.setFont(robotoBoldBig);
 
 
-        setTitle("Book Editor");
+        setTitle("Java Log Reader");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setContentPane(contentPane);
         pack();
@@ -108,14 +113,46 @@ public class LogReader extends JFrame{
                     }
                 }
                 try {
-                    con = HttpClient.newHttpClient();
-                    cf = new ConnectToFile(HTTP_REQUEST_BEGIN + host + pathText.getText() + fileText.getText(), con, explicitSearchText.getText(), outputText, fileText.getText(), username, password, noSearchCheck.isSelected());
-                    outputText.setText(cf.outputString());
-                } catch (Exception ex) {
-                    ex.printStackTrace();
+                    String url = UrlBuilder.buildUrl(host, pathText.getText(), fileText.getText());
+                    con = HttpClient.newBuilder()
+                            .authenticator(new Authenticator() {
+                                @Override
+                                protected PasswordAuthentication getPasswordAuthentication() {
+                                    return new PasswordAuthentication(username, password.toCharArray());
+                                }
+                            })
+                            .build();
+
+                    cf = new ConnectToFile(url, con, explicitSearchText.getText(), outputText, fileText.getText(), username, password, noSearchCheck.isSelected());
+                    // Handle the CompletableFuture properly
+                    cf.outputString()
+                            .exceptionally(ex -> {
+                                SwingUtilities.invokeLater(() -> {
+                                    outputText.setText("Error: " + ex.getMessage());
+                                    JOptionPane.showMessageDialog(null,
+                                            "Error processing request: " + ex.getMessage(),
+                                            "Error",
+                                            JOptionPane.ERROR_MESSAGE);
+                                });
+                                return null;
+                            });
+
+                } catch (IllegalArgumentException ex) {
+                    JOptionPane.showMessageDialog(null,
+                            "Invalid input: " + ex.getMessage(),
+                            "Error",
+                            JOptionPane.ERROR_MESSAGE);
+                } catch (URISyntaxException ex) {
+                    JOptionPane.showMessageDialog(null,
+                            "Invalid URL format: " + ex.getMessage(),
+                            "Error",
+                            JOptionPane.ERROR_MESSAGE);
+                } catch (MalformedURLException ex) {
+                    throw new RuntimeException(ex);
                 }
             }
         });
+
         exitBtn.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
