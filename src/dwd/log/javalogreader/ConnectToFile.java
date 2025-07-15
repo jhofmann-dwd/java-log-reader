@@ -57,8 +57,8 @@ public class ConnectToFile {
     private String generateCacheKey() {
         return String.format("%s_%s_%s_%s",
                 url.hashCode(),
-                minTime.toString(),
-                maxTime.toString(),
+                minTime.toString().replace(":", ""),  // Remove colons from time
+                maxTime.toString().replace(":", ""),  // Remove colons from time
                 input == null ? "null" : input.hashCode()
         );
     }
