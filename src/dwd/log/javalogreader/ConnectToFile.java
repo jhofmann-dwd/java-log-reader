@@ -235,10 +235,21 @@ public class ConnectToFile {
     private void updateTextArea(final String text) {
         SwingUtilities.invokeLater(() -> {
             if (result.isDisplayable()) {
-                result.append(text);
+                // Clear the text area if it's getting too large
+                if (result.getText().length() > 1000000) {
+                    result.setText("");
+                }
+
+                // Ensure text ends with a newline
+                String textToAppend = text.endsWith("\n") ? text : text + "\n";
+                result.append(textToAppend);
+
+                // Scroll to the bottom
+                result.setCaretPosition(result.getDocument().getLength());
             }
         });
     }
+
 
     public CompletableFuture<Boolean> checkAuth(String username, String password, String host) {
         HttpClient client = HttpClient.newBuilder()

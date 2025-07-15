@@ -127,7 +127,9 @@ public class LogReader extends JFrame {
         setLocationRelativeTo(null);
 
         outputText.setEditable(false);
-
+        outputText.setLineWrap(true);
+        outputText.setWrapStyleWord(true);
+        outputText.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
 
         // Set the frame visible
         setVisible(true);
