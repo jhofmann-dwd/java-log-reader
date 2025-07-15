@@ -92,7 +92,7 @@ public class LoginForm extends JDialog {
 
         cf.checkAuth(userText.getText(), new String(passText.getPassword()), hostText.getText())
                 .thenAccept(success -> {
-                    if(success) {
+                    if (success) {
                         try {
                             LogReader lr = new LogReader(userText.getText(),
                                     new String(passText.getPassword()),
@@ -116,6 +116,9 @@ public class LoginForm extends JDialog {
 
 
     private void onCancel() {
+        if (cf != null) {
+            cf.cleanup();
+        }
         System.exit(1);
         dispose();
     }
