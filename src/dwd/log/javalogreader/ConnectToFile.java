@@ -11,8 +11,10 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.Timer;
@@ -73,126 +75,171 @@ public class ConnectToFile {
     }
 
 
+    public static class LogEntry {
+        private final int lineNumber;
+        private final LocalDateTime timestamp;
+        private final String content;
+        private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
+
+        public LogEntry(int lineNumber, LocalDateTime timestamp, String content) {
+            this.lineNumber = lineNumber;
+            this.timestamp = timestamp;
+            this.content = content;
+        }
+
+        public static Optional<LogEntry> parse(String line, int lineNumber) {
+            if (line.length() <= 8) return Optional.empty();
+
+            try {
+                long time = Integer.parseInt(line.substring(0, 8), 16) * 1000L;
+                LocalDateTime date = LocalDateTime.ofInstant(
+                        Instant.ofEpochMilli(time),
+                        ZoneId.systemDefault());
+                return Optional.of(new LogEntry(lineNumber, date, line.substring(8)));
+            } catch (NumberFormatException e) {
+                return Optional.empty();
+            }
+        }
+
+        public boolean isWithinTimeRange(LocalTime minTime, LocalTime maxTime) {
+            return timestamp.isAfter(minTime.atDate(timestamp.toLocalDate())) &&
+                    timestamp.isBefore(maxTime.atDate(timestamp.toLocalDate()));
+        }
+
+        public boolean matchesInput(String input, boolean inputBox) {
+            return input == null || (input.isEmpty() && inputBox) || content.contains(input);
+        }
+
+        public String format() {
+            return String.format("[Line: %d | Time: %s]%s",
+                    lineNumber,
+                    timestamp.format(TIME_FORMATTER),
+                    content);
+        }
+    }
+
     public CompletableFuture<String> outputString() {
         try {
             Path cacheFile = getCacheFile();
             String cacheKey = generateCacheKey();
 
-            // Check if cache exists and is valid
             if (Files.exists(cacheFile)) {
-                activeFiles.put(cacheKey, cacheFile);
-                scheduleFileDeletion(cacheFile, cacheKey);
-                return CompletableFuture.supplyAsync(() -> {
+                return handleCachedFile(cacheFile, cacheKey);
+            }
+
+            return handleHttpRequest(cacheFile, cacheKey);
+        } catch (Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    private CompletableFuture<String> handleCachedFile(Path cacheFile, String cacheKey) {
+        activeFiles.put(cacheKey, cacheFile);
+        scheduleFileDeletion(cacheFile, cacheKey);
+
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                String content = Files.readString(cacheFile);
+                SwingUtilities.invokeLater(() -> {
+                    if (result.isDisplayable()) {
+                        result.setText(content);
+                    }
+                });
+                return "Loaded from cache";
+            } catch (IOException e) {
+                throw new CompletionException(e);
+            }
+        }, executorService);
+    }
+
+    private CompletableFuture<String> handleHttpRequest(Path cacheFile, String cacheKey)
+            throws URISyntaxException {
+        HttpClient client = createHttpClient();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(new URI(url))
+                .GET()
+                .build();
+
+        return client.sendAsync(request, HttpResponse.BodyHandlers.ofInputStream())
+                .thenApplyAsync(response -> processResponse(response, cacheFile, cacheKey),
+                        executorService);
+    }
+
+    private HttpClient createHttpClient() {
+        return HttpClient.newBuilder()
+                .authenticator(new Authenticator() {
+                    @Override
+                    protected PasswordAuthentication getPasswordAuthentication() {
+                        return new PasswordAuthentication(username, password.toCharArray());
+                    }
+                })
+                .build();
+    }
+
+    private String processResponse(HttpResponse<InputStream> response, Path cacheFile,
+                                   String cacheKey) {
+        if (response.statusCode() == 401) {
+            throw new CompletionException(
+                    new IOException("Unauthorized: Please check your credentials"));
+        }
+
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(response.body(), StandardCharsets.UTF_8), BUFFER_SIZE);
+             BufferedWriter writer = Files.newBufferedWriter(cacheFile, StandardCharsets.UTF_8)) {
+
+            List<String> currentBatch = new ArrayList<>(BATCH_SIZE);
+            AtomicInteger matchesCount = new AtomicInteger();
+            AtomicInteger lineCounter = new AtomicInteger();
+
+            String line;
+            while ((line = reader.readLine()) != null) {
+                processLogLine(line, lineCounter.incrementAndGet(), currentBatch,
+                        matchesCount, writer);
+            }
+
+            finalizeBatch(currentBatch, matchesCount.get(), writer);
+            activeFiles.put(cacheKey, cacheFile);
+            scheduleFileDeletion(cacheFile, cacheKey);
+
+            return "Processing complete";
+        } catch (IOException e) {
+            throw new CompletionException(e);
+        }
+    }
+
+    private void processLogLine(String line, int lineNumber, List<String> currentBatch,
+                                AtomicInteger matchesCount, BufferedWriter writer) throws IOException {
+        LogEntry.parse(line, lineNumber)
+                .filter(entry -> entry.isWithinTimeRange(minTime, maxTime))
+                .filter(entry -> entry.matchesInput(input, inputBox))
+                .ifPresent(entry -> {
+                    String formattedLine = entry.format();
+                    currentBatch.add(formattedLine);
                     try {
-                        List<String> lines = Files.readAllLines(cacheFile);
-                        String content = String.join("\n", lines);
-                        SwingUtilities.invokeLater(() -> {
-                            if (result.isDisplayable()) {
-                                result.setText(content);
-                            }
-                        });
-                        return "Loaded from cache";
+                        writer.write(formattedLine + "\n");
+                        matchesCount.incrementAndGet();
+
+                        if (currentBatch.size() >= BATCH_SIZE) {
+                            updateTextArea(String.join("\n", currentBatch) + "\n");
+                            currentBatch.clear();
+                        }
                     } catch (IOException e) {
                         throw new CompletionException(e);
                     }
-                }, executorService);
-            }
+                });
+    }
 
-            HttpClient client = HttpClient.newBuilder()
-                    .authenticator(new Authenticator() {
-                        @Override
-                        protected PasswordAuthentication getPasswordAuthentication() {
-                            return new PasswordAuthentication(username, password.toCharArray());
-                        }
-                    })
-                    .build();
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(new URI(url))
-                    .GET()
-                    .build();
-
-            return client.sendAsync(request, HttpResponse.BodyHandlers.ofInputStream())
-                    .thenApplyAsync(response -> {
-                        if (response.statusCode() == 401) {
-                            throw new CompletionException(
-                                    new IOException("Unauthorized: Bitte überprüfen Sie Ihre Anmeldedaten"));
-                        }
-
-                        try (BufferedReader reader = new BufferedReader(
-                                new InputStreamReader(response.body(), StandardCharsets.UTF_8), BUFFER_SIZE);
-                             BufferedWriter writer = Files.newBufferedWriter(cacheFile, StandardCharsets.UTF_8)) {
-
-                            AtomicInteger lineCounter = new AtomicInteger();
-                            AtomicInteger matchesCount = new AtomicInteger();
-                            List<String> currentBatch = new ArrayList<>(BATCH_SIZE);
-
-                            String line;
-                            while ((line = reader.readLine()) != null) {
-                                final int currentLineNum = lineCounter.incrementAndGet();
-
-                                if (line.length() > 8) {
-                                    try {
-                                        long time = Integer.parseInt(line.substring(0, 8), 16) * 1000L;
-                                        LocalDateTime date = LocalDateTime.ofInstant(
-                                                java.time.Instant.ofEpochMilli(time),
-                                                java.time.ZoneId.systemDefault());
-
-                                        if (date.isAfter(minTime.atDate(date.toLocalDate())) &&
-                                                date.isBefore(maxTime.atDate(date.toLocalDate()))) {
-
-                                            if (input != null && (input.isEmpty() && inputBox ||
-                                                    line.contains(input))) {
-
-                                                DateTimeFormatter dateFormat =
-                                                        DateTimeFormatter.ofPattern("HH:mm:ss");
-                                                String formattedLine = String.format("[Line: %d | Time: %s]%s",
-                                                        currentLineNum,
-                                                        date.format(dateFormat),
-                                                        line.substring(8));
-
-                                                currentBatch.add(formattedLine);
-                                                writer.write(formattedLine + "\n");
-                                                matchesCount.incrementAndGet();
-
-                                                if (currentBatch.size() >= BATCH_SIZE) {
-                                                    final String batchText = String.join("\n", currentBatch) + "\n";
-                                                    updateTextArea(batchText);
-                                                    currentBatch.clear();
-                                                }
-                                            }
-                                        }
-                                    } catch (NumberFormatException ignored) {
-                                        // Skip malformed lines
-                                    }
-                                }
-                            }
-
-                            if (!currentBatch.isEmpty()) {
-                                final String batchText = String.join("\n", currentBatch) + "\n";
-                                updateTextArea(batchText);
-                                writer.write(batchText);
-                            }
-
-                            final String totalCount = "\nTOTAL: " + matchesCount.get() + " Lines.";
-                            updateTextArea(totalCount);
-                            writer.write(totalCount);
-
-                            activeFiles.put(cacheKey, cacheFile);
-                            scheduleFileDeletion(cacheFile, cacheKey);
-
-                            return "Processing complete";
-
-                        } catch (IOException e) {
-                            throw new CompletionException(e);
-                        }
-                    }, executorService);
-
-        } catch (Exception e) {
-            CompletableFuture<String> future = new CompletableFuture<>();
-            future.completeExceptionally(e);
-            return future;
+    private void finalizeBatch(List<String> currentBatch, int matchesCount,
+                               BufferedWriter writer) throws IOException {
+        if (!currentBatch.isEmpty()) {
+            String batchText = String.join("\n", currentBatch) + "\n";
+            updateTextArea(batchText);
+            writer.write(batchText);
         }
+
+        String totalCount = "\nTOTAL: " + matchesCount + " Lines.";
+        updateTextArea(totalCount);
+        writer.write(totalCount);
     }
 
     private void scheduleFileDeletion(Path file, String cacheKey) {
